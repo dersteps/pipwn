@@ -7,6 +7,10 @@ First of all: this is a dirty hack, nothing special. And please keep in mind tha
 
 When using this, please keep in mind that this is a PoC - it might have some bugs and do something unexpected to your network! And yes, I'm aware that it is not done in the best of ways. If you improve it, let me know!
 
+Yuk, what's with the colors!?
+=====
+Yeah, got carried away with styling this thing a bit :)
+
 License
 =====
 Released under the MIT license (see LICENSE file for details). 
